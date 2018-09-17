@@ -23,6 +23,9 @@ message Loss {
 
   // If not left to default, applies random example sampling.
   optional RandomExampleSampler random_example_sampler = 6;
+
+  // Optional mask to suppress bounding box loss from specified regions.
+  optional BboxIgnoreBackgroundMask bbox_ignore_background_mask = 7;
 }
 
 // Configuration for bounding box localization loss function.
@@ -161,4 +164,9 @@ message RandomExampleSampler {
   // The desired fraction of positive samples in batch when applying random
   // example sampling.
   optional float positive_sample_fraction = 1 [default = 0.01];
+}
+
+message BboxIgnoreBackgroundMask {
+  // Fraction of overlap at which to ignore the bounding box.
+  optional float overlap_threshold = 1;
 }

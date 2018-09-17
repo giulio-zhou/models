@@ -66,8 +66,20 @@ def build(loss_config):
     random_example_sampler = sampler.BalancedPositiveNegativeSampler(
         positive_fraction=loss_config.random_example_sampler.
         positive_sample_fraction)
+  bbox_ignore_background_mask = None
+  if loss_config.HasField('bbox_ignore_background_mask'):
+    class BboxIgnoreBackgroundMask():
+        def __init__(self, overlap_threshold):
+            self.overlap_threshold = overlap_threshold
+    overlap_threshold = loss_config.bbox_ignore_background_mask.overlap_threshold
+    if overlap_threshold < 0 or overlap_threshold > 1:
+      raise ValueError('BboxIgnoreBackgroundMask should have threshold between'
+                       '0 and 1')
+    bbox_ignore_background_mask = BboxIgnoreBackgroundMask(overlap_threshold)
+
   return (classification_loss, localization_loss, classification_weight,
-          localization_weight, hard_example_miner, random_example_sampler)
+          localization_weight, hard_example_miner, random_example_sampler,
+          bbox_ignore_background_mask)
 
 
 def build_hard_example_miner(config,

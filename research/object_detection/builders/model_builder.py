@@ -219,8 +219,8 @@ def _build_ssd_model(ssd_config, is_training, add_summaries,
   non_max_suppression_fn, score_conversion_fn = post_processing_builder.build(
       ssd_config.post_processing)
   (classification_loss, localization_loss, classification_weight,
-   localization_weight, hard_example_miner,
-   random_example_sampler) = losses_builder.build(ssd_config.loss)
+   localization_weight, hard_example_miner, random_example_sampler,
+   bbox_ignore_background_mask) = losses_builder.build(ssd_config.loss)
   normalize_loss_by_num_matches = ssd_config.normalize_loss_by_num_matches
   normalize_loc_loss_by_codesize = ssd_config.normalize_loc_loss_by_codesize
   weight_regression_loss_by_score = (ssd_config.weight_regression_loss_by_score)
@@ -266,6 +266,7 @@ def _build_ssd_model(ssd_config, is_training, add_summaries,
       inplace_batchnorm_update=ssd_config.inplace_batchnorm_update,
       add_background_class=add_background_class,
       random_example_sampler=random_example_sampler,
+      bbox_ignore_background_mask=bbox_ignore_background_mask,
       expected_classification_loss_under_sampling=
       expected_classification_loss_under_sampling)
 

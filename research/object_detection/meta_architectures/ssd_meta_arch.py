@@ -244,6 +244,7 @@ class SSDMetaArch(model.DetectionModel):
                inplace_batchnorm_update=False,
                add_background_class=True,
                random_example_sampler=None,
+               bbox_ignore_background_mask=None,
                expected_classification_loss_under_sampling=None,
                target_assigner_instance=None):
     """SSDMetaArch Constructor.
@@ -327,6 +328,7 @@ class SSDMetaArch(model.DetectionModel):
     self._matcher = matcher
     self._region_similarity_calculator = region_similarity_calculator
     self._add_background_class = add_background_class
+    self._bbox_ignore_background_mask = bbox_ignore_background_mask
 
     # Needed for fine-tuning from classification checkpoints whose
     # variables do not have the feature extractor scope.
@@ -687,6 +689,39 @@ class SSDMetaArch(model.DetectionModel):
       if self._add_summaries:
         self._summarize_target_assignment(
             self.groundtruth_lists(fields.BoxListFields.boxes), match_list)
+
+      if self._bbox_ignore_background_mask:
+        # Filter using a single mask provided in ground truth.
+        batch_size, num_anchors, box_code_dimension = \
+            prediction_dict['box_encodings'].get_shape()
+        batch_ignore_masks = self.groundtruth_lists(fields.BoxListFields.masks)
+        batch_sampled_indicator = []
+        print(batch_ignore_masks)
+        for i in range(batch_size):
+            # The single provided groundtruth mask is the ignore mask.
+            ignore_mask = tf.cast(batch_ignore_masks[i][0], tf.float32)
+            height, width = ignore_mask.get_shape().as_list()
+            ignore_mask = tf.reshape(ignore_mask, [1, height, width, 1])
+            bboxes = prediction_dict['box_encodings'][i]
+            bboxes = tf.minimum(tf.maximum(bboxes, 0.), 1.)
+            # mask = tf.tile([[height, width, height, width]], [num_anchors, 1])
+            bboxes = tf.cast(bboxes * tf.cast([height, width, height, width], tf.float32), tf.int32)
+            bboxes = tf.map_fn(lambda x: tf.reduce_mean(ignore_mask[x[0]:x[2], x[1]:x[3]]), bboxes, dtype=tf.float32)
+            print(bboxes)
+            sampled_indicator = bboxes < self._bbox_ignore_background_mask.overlap_threshold
+            # bbox_idx = [0] * num_anchors 
+            # ignore_intersections = tf.image.crop_and_resize(
+            #     ignore_mask, bboxes, bbox_idx, (100, 100), method='nearest')
+            # sampled_indicator = \
+            #     tf.reduce_mean(ignore_intersections, axis=[1, 2, 3]) < \
+            #     self._bbox_ignore_background_mask.overlap_threshold
+            sampled_indicator = tf.cast(sampled_indicator, tf.float32)
+            batch_sampled_indicator.append(sampled_indicator)
+        batch_sampled_indicator = tf.stack(batch_sampled_indicator, axis=0)
+        batch_reg_weights = tf.multiply(batch_sampled_indicator,
+                                        batch_reg_weights)
+        batch_cls_weights = tf.multiply(batch_sampled_indicator,
+                                        batch_cls_weights)
 
       if self._random_example_sampler:
         batch_sampled_indicator = tf.to_float(
