@@ -449,6 +449,35 @@ class BootstrappedSigmoidClassificationLoss(Loss):
     return per_entry_cross_ent * tf.expand_dims(weights, 2)
 
 
+# Giulio's custom losses.
+class BoundedSigmoidCrossEntropyLoss(Loss):
+  def _compute_loss(self,
+                    prediction_tensor,
+                    target_tensor,
+                    weights,
+                    class_indices=None):
+    # Weights are the upper bounds.
+    weights = tf.expand_dims(weights, 2)
+    if class_indices is not None:
+      weights *= tf.reshape(
+          ops.indices_to_dense_vector(class_indices,
+                                      tf.shape(prediction_tensor)[2]),
+          [1, 1, -1])
+    per_entry_cross_ent = (tf.nn.sigmoid_cross_entropy_with_logits(
+        labels=target_tensor, logits=prediction_tensor))
+    return (per_entry_cross_ent *
+            tf.cast(prediction_tensor < weights, tf.float32))
+
+
+class UnweightedSmoothL1LocalizationLoss(WeightedSmoothL1LocalizationLoss):
+  def __init__(self, delta=0.5):
+    super(UnweightedSmoothL1LocalizationLoss, self).__init__(delta)
+  def _compute_loss(self, prediction_tensor, target_tensor, weights):
+    uniform_weights = tf.ones(tf.shape(weights))
+    return super(UnweightedSmoothL1LocalizationLoss, self)._compute_loss(
+        prediction_tensor, target_tensor, weights)
+
+
 class HardExampleMiner(object):
   """Hard example mining for regions in a list of images.
 

@@ -183,6 +183,11 @@ def _build_localization_loss(loss_config):
   if loss_type == 'weighted_iou':
     return losses.WeightedIOULocalizationLoss()
 
+  if loss_type == 'unweighted_smooth_l1':
+    print('unweighted smooth l1')
+    return losses.UnweightedSmoothL1LocalizationLoss(
+        loss_config.weighted_smooth_l1.delta)
+
   raise ValueError('Empty loss config.')
 
 
@@ -202,6 +207,7 @@ def _build_classification_loss(loss_config):
     raise ValueError('loss_config not of type losses_pb2.ClassificationLoss.')
 
   loss_type = loss_config.WhichOneof('classification_loss')
+  print('hello', loss_type)
 
   if loss_type == 'weighted_sigmoid':
     return losses.WeightedSigmoidClassificationLoss()
@@ -230,5 +236,10 @@ def _build_classification_loss(loss_config):
     return losses.BootstrappedSigmoidClassificationLoss(
         alpha=config.alpha,
         bootstrap_type=('hard' if config.hard_bootstrap else 'soft'))
+
+  if loss_type == 'bounded_sigmoid':
+    print('we bounded')
+    config = loss_config.bounded_sigmoid
+    return losses.BoundedSigmoidCrossEntropyLoss()
 
   raise ValueError('Empty loss config.')

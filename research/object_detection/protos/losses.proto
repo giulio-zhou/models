@@ -34,6 +34,7 @@ message LocalizationLoss {
     WeightedL2LocalizationLoss weighted_l2 = 1;
     WeightedSmoothL1LocalizationLoss weighted_smooth_l1 = 2;
     WeightedIOULocalizationLoss weighted_iou = 3;
+    UnweightedSmoothL1LocalizationLoss unweighted_smooth_l1 = 4;
   }
 }
 
@@ -57,6 +58,15 @@ message WeightedSmoothL1LocalizationLoss {
   optional float delta = 2 [default=1.0];
 }
 
+message UnweightedSmoothL1LocalizationLoss {
+  // DEPRECATED, do not use.
+  // Output loss per anchor.
+  optional bool anchorwise_output = 1 [default=false];
+
+  // Delta value for huber loss.
+  optional float delta = 2 [default=1.0];
+}
+
 // Intersection over union location loss: 1 - IOU
 message WeightedIOULocalizationLoss {
 }
@@ -69,6 +79,7 @@ message ClassificationLoss {
     WeightedSoftmaxClassificationAgainstLogitsLoss weighted_logits_softmax = 5;
     BootstrappedSigmoidClassificationLoss bootstrapped_sigmoid = 3;
     SigmoidFocalClassificationLoss weighted_sigmoid_focal = 4;
+    BoundedSigmoidClassificationLoss bounded_sigmoid = 6;
   }
 }
 
@@ -125,6 +136,9 @@ message BootstrappedSigmoidClassificationLoss {
   // DEPRECATED, do not use.
   // Output loss per anchor.
   optional bool anchorwise_output = 3 [default=false];
+}
+
+message BoundedSigmoidClassificationLoss {
 }
 
 // Configuration for hard example miner.
