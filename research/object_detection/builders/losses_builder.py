@@ -238,8 +238,11 @@ def _build_classification_loss(loss_config):
         bootstrap_type=('hard' if config.hard_bootstrap else 'soft'))
 
   if loss_type == 'bounded_sigmoid':
-    print('we bounded')
     config = loss_config.bounded_sigmoid
     return losses.BoundedSigmoidCrossEntropyLoss()
+
+  if loss_type == 'quadratic_bounded_sigmoid':
+    config = loss_config.quadratic_bounded_sigmoid
+    return losses.QuadraticBoundedSigmoidCrossEntropyLoss()
 
   raise ValueError('Empty loss config.')
