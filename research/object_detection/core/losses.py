@@ -485,17 +485,30 @@ class QuadraticBoundedSigmoidCrossEntropyLoss(Loss):
         labels=target_tensor, logits=prediction_tensor))
     squared_dist = tf.square(tf.sigmoid(prediction_tensor) - target_tensor) * 20.
     above_conf = tf.cast(prediction_tensor > weights, tf.float32)
-    tf.summary.tensor_summary('Cross Entropy losses', per_entry_cross_ent,
-                              family='Debug')
-    tf.summary.tensor_summary('Squared dist', squared_dist,
-                              family='Debug')
-    tf.summary.tensor_summary('Weights', weights,
-                              family='Debug')
     # Apply quadratic loss if predictions go above soft target.
     loss = per_entry_cross_ent + above_conf * squared_dist
-    tf.summary.tensor_summary('Loss', loss,
-                              family='Debug')
     return loss
+
+
+class SoftTargetSigmoidCrossEntropyLoss(Loss):
+  def _compute_loss(self,
+                    prediction_tensor,
+                    target_tensor,
+                    weights,
+                    class_indices=None):
+    weights = tf.expand_dims(weights, 2)
+    if class_indices is not None:
+      weights *= tf.reshape(
+          ops.indices_to_dense_vector(class_indices,
+                                      tf.shape(prediction_tensor)[2]),
+          [1, 1, -1])
+    # Directly regress to soft targets.
+    # target_tensor = tf.concat([1 - weights, weights], axis=-1)
+    # per_entry_cross_ent = (tf.nn.softmax_cross_entropy_with_logits_v2(
+    #     labels=target_tensor, logits=prediction_tensor))
+    per_entry_cross_ent = tf.nn.sigmoid_cross_entropy_with_logits(
+        labels=target_tensor * weights, logits=prediction_tensor)
+    return per_entry_cross_ent
 
 class UnweightedSmoothL1LocalizationLoss(WeightedSmoothL1LocalizationLoss):
   def __init__(self, delta=0.5):

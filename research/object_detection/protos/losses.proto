@@ -81,6 +81,7 @@ message ClassificationLoss {
     SigmoidFocalClassificationLoss weighted_sigmoid_focal = 4;
     BoundedSigmoidClassificationLoss bounded_sigmoid = 6;
     QuadraticBoundedSigmoidClassificationLoss quadratic_bounded_sigmoid = 7;
+    SoftTargetSigmoidClassificationLoss soft_target_sigmoid = 8;
   }
 }
 
@@ -143,6 +144,9 @@ message BoundedSigmoidClassificationLoss {
 }
 
 message QuadraticBoundedSigmoidClassificationLoss {
+}
+
+message SoftTargetSigmoidClassificationLoss {
 }
 
 // Configuration for hard example miner.

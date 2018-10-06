@@ -245,4 +245,8 @@ def _build_classification_loss(loss_config):
     config = loss_config.quadratic_bounded_sigmoid
     return losses.QuadraticBoundedSigmoidCrossEntropyLoss()
 
+  if loss_type == 'soft_target_sigmoid':
+    config = loss_config.soft_target_sigmoid
+    return losses.SoftTargetSigmoidCrossEntropyLoss()
+
   raise ValueError('Empty loss config.')
