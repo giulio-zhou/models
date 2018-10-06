@@ -167,6 +167,7 @@ def main(unused_argv):
       args = ['PYTHONPATH=$PYTHONPATH:slim',
               'python', 'object_detection/model_main.py',
               '--pipeline_config_path', FLAGS.pipeline_config_path,
+              '--model_dir', FLAGS.model_dir,
               '--checkpoint_dir', FLAGS.model_dir,
               '--sample_1_of_n_eval_examples', str(FLAGS.sample_1_of_n_eval_examples),
               '--run_once', str(True)]
