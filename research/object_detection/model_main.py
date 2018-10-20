@@ -41,6 +41,8 @@ flags.DEFINE_integer('sample_1_of_n_eval_on_train_examples', 5, 'Will sample '
                      'one of every n train input examples for evaluation, '
                      'where n is provided. This is only used if '
                      '`eval_training_data` is True.')
+flags.DEFINE_float(
+    'gpu_memory_fraction', 0.2, "Fraction of GPU memory to allocate.")
 flags.DEFINE_string(
     'hparams_overrides', None, 'Hyperparameter overrides, '
     'represented as a string containing comma-separated '
@@ -59,7 +61,10 @@ FLAGS = flags.FLAGS
 def main(unused_argv):
   flags.mark_flag_as_required('model_dir')
   flags.mark_flag_as_required('pipeline_config_path')
-  config = tf.estimator.RunConfig(model_dir=FLAGS.model_dir)
+  session_config = tf.ConfigProto()
+  session_config.gpu_options.per_process_gpu_memory_fraction = FLAGS.gpu_memory_fraction
+  config = tf.estimator.RunConfig(model_dir=FLAGS.model_dir,
+                                  session_config=session_config)
 
   train_and_eval_dict = model_lib.create_estimator_and_inputs(
       run_config=config,

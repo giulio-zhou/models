@@ -170,6 +170,7 @@ def main(unused_argv):
               '--model_dir', FLAGS.model_dir,
               '--checkpoint_dir', FLAGS.model_dir,
               '--sample_1_of_n_eval_examples', str(FLAGS.sample_1_of_n_eval_examples),
+              '--gpu_memory_fraction', str(0.2),
               '--run_once', str(True)]
       print(' '.join(args))
       p = subprocess.Popen(' '.join(args), stderr=subprocess.STDOUT, shell=True)
