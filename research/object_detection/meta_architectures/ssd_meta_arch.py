@@ -643,47 +643,7 @@ class SSDMetaArch(model.DetectionModel):
             fields.DetectionResultFields.detection_masks] = nmsed_masks
       return detection_dict
 
-  def loss(self, prediction_dict, true_image_shapes, scope=None):
-    """Compute scalar loss tensors with respect to provided groundtruth.
-
-    Calling this function requires that groundtruth tensors have been
-    provided via the provide_groundtruth function.
-
-    Args:
-      prediction_dict: a dictionary holding prediction tensors with
-        1) box_encodings: 3-D float tensor of shape [batch_size, num_anchors,
-          box_code_dimension] containing predicted boxes.
-        2) class_predictions_with_background: 3-D float tensor of shape
-          [batch_size, num_anchors, num_classes+1] containing class predictions
-          (logits) for each of the anchors. Note that this tensor *includes*
-          background class predictions.
-      true_image_shapes: int32 tensor of shape [batch, 3] where each row is
-        of the form [height, width, channels] indicating the shapes
-        of true images in the resized images, as resized images can be padded
-        with zeros.
-      scope: Optional scope name.
-
-    Returns:
-      a dictionary mapping loss keys (`localization_loss` and
-        `classification_loss`) to scalar tensors representing corresponding loss
-        values.
-    """
-    with tf.name_scope(scope, 'Loss', prediction_dict.values()):
-      keypoints = None
-      if self.groundtruth_has_field(fields.BoxListFields.keypoints):
-        keypoints = self.groundtruth_lists(fields.BoxListFields.keypoints)
-      weights = None
-      if self.groundtruth_has_field(fields.BoxListFields.weights):
-        weights = self.groundtruth_lists(fields.BoxListFields.weights)
-      (batch_cls_targets, batch_cls_weights, batch_reg_targets,
-       batch_reg_weights, match_list) = self._assign_targets(
-           self.groundtruth_lists(fields.BoxListFields.boxes),
-           self.groundtruth_lists(fields.BoxListFields.classes),
-           keypoints, weights)
-      if self._add_summaries:
-        self._summarize_target_assignment(
-            self.groundtruth_lists(fields.BoxListFields.boxes), match_list)
-
+      """
       if self._bbox_ignore_background_mask:
         # Filter using a single mask provided in ground truth.
         batch_size, num_anchors, box_code_dimension = \
@@ -716,36 +676,125 @@ class SSDMetaArch(model.DetectionModel):
                                         batch_reg_weights)
         batch_cls_weights = tf.multiply(batch_sampled_indicator,
                                         batch_cls_weights)
+      """
 
-      if self._random_example_sampler:
-        batch_sampled_indicator = tf.to_float(
-            shape_utils.static_or_dynamic_map_fn(
-                self._minibatch_subsample_fn,
-                [batch_cls_targets, batch_cls_weights],
-                dtype=tf.bool,
-                parallel_iterations=self._parallel_iterations,
-                back_prop=True))
-        batch_reg_weights = tf.multiply(batch_sampled_indicator,
-                                        batch_reg_weights)
-        batch_cls_weights = tf.multiply(batch_sampled_indicator,
-                                        batch_cls_weights)
+  def loss(self, prediction_dict, true_image_shapes, scope=None):
+    """Compute scalar loss tensors with respect to provided groundtruth.
+
+    Calling this function requires that groundtruth tensors have been
+    provided via the provide_groundtruth function.
+
+    Args:
+      prediction_dict: a dictionary holding prediction tensors with
+        1) box_encodings: 3-D float tensor of shape [batch_size, num_anchors,
+          box_code_dimension] containing predicted boxes.
+        2) class_predictions_with_background: 3-D float tensor of shape
+          [batch_size, num_anchors, num_classes+1] containing class predictions
+          (logits) for each of the anchors. Note that this tensor *includes*
+          background class predictions.
+      true_image_shapes: int32 tensor of shape [batch, 3] where each row is
+        of the form [height, width, channels] indicating the shapes
+        of true images in the resized images, as resized images can be padded
+        with zeros.
+      scope: Optional scope name.
+
+    Returns:
+      a dictionary mapping loss keys (`localization_loss` and
+        `classification_loss`) to scalar tensors representing corresponding loss
+        values.
+    """
+    with tf.name_scope(scope, 'Loss', prediction_dict.values()):
+      keypoints = None
+      if self.groundtruth_has_field(fields.BoxListFields.keypoints):
+        keypoints = self.groundtruth_lists(fields.BoxListFields.keypoints)
+      weights = None
+      if self.groundtruth_has_field(fields.BoxListFields.weights):
+        weights = self.groundtruth_lists(fields.BoxListFields.weights)
 
       losses_mask = None
       if self.groundtruth_has_field(fields.InputDataFields.is_annotated):
         losses_mask = tf.stack(self.groundtruth_lists(
             fields.InputDataFields.is_annotated))
-      location_losses = self._localization_loss(
-          prediction_dict['box_encodings'],
-          batch_reg_targets,
-          ignore_nan_targets=True,
-          weights=batch_reg_weights,
-          losses_mask=losses_mask)
 
-      cls_losses = self._classification_loss(
-          prediction_dict['class_predictions_with_background'],
-          batch_cls_targets,
-          weights=batch_cls_weights,
-          losses_mask=losses_mask)
+      location_losses, cls_losses = 0., 0.
+      all_batch_reg_weights, all_batch_cls_weights = [], []
+      for l, (loc_loss_fn, cls_loss_fn, loc_loss_weight, cls_loss_weight) in \
+          enumerate(zip(self._localization_loss, self._classification_loss,
+                        self._localization_loss_weight,
+                        self._classification_loss_weight)):
+        # Filter for all elements with label l.
+        all_boxes = self.groundtruth_lists(fields.BoxListFields.boxes)
+        all_classes = self.groundtruth_lists(fields.BoxListFields.classes)
+        class_labels = all_classes
+        print(all_boxes)
+        print(all_classes)
+        print(l, loc_loss_weight, cls_loss_weight)
+        if len(self._localization_loss) >= 1:
+            # Specifying more than one loss assumes a binary
+            # classification setup where multiple rounds of matches are 
+            # performed for each set and the losses linearly combined.
+            matching_classes = map(lambda x: x[:, l], all_classes)
+            multiply_by_class = lambda x: [tf.multiply(y, coeff) 
+                                           for y, coeff in zip(x, matching_classes)]
+            # multiply_by_class = lambda x: [y for y, coeff in zip(x, matching_classes)]
+            class_labels = [tf.one_hot(tf.zeros(tf.shape(c)[0],
+                                       dtype=tf.int32), self.num_classes) for c in all_classes]
+            print(matching_classes, class_labels)
+        else:
+            multiply_by_class = lambda x: x
+        # relevant_boxes = multiply_by_class(all_boxes)
+        # relevant_classes = multiply_by_class(all_classes)
+        relevant_keypoints, relevant_weights, relevant_losses_mask = None, None, None
+        if weights is not None:
+            # Setting weights to zero causes corresponding boxes to be ignored
+            # during anchor assignment.
+            relevant_weights = multiply_by_class(weights)
+        if keypoints is not None:
+            relevant_keypoints = multiply_by_class(keypoints)
+        if losses_mask is not None:
+            relevant_losses_mask = multiply_by_class(losses_mask)
+        
+        # Normal anchor assignment (UNCHANGED).
+        (batch_cls_targets, batch_cls_weights, batch_reg_targets,
+         batch_reg_weights, match_list) = self._assign_targets(
+            all_boxes, class_labels, keypoints, relevant_weights)
+             # relevant_boxes, relevant_classes,
+             # relevant_keypoints, relevant_weights)
+        if self._add_summaries:
+          self._summarize_target_assignment(
+              self.groundtruth_lists(fields.BoxListFields.boxes), match_list)
+
+        if self._random_example_sampler:
+          batch_sampled_indicator = tf.to_float(
+              shape_utils.static_or_dynamic_map_fn(
+                  self._minibatch_subsample_fn,
+                  [batch_cls_targets, batch_cls_weights],
+                  dtype=tf.bool,
+                  parallel_iterations=self._parallel_iterations,
+                  back_prop=True))
+          batch_reg_weights = tf.multiply(batch_sampled_indicator,
+                                          batch_reg_weights)
+          batch_cls_weights = tf.multiply(batch_sampled_indicator,
+                                          batch_cls_weights)
+        print(prediction_dict['class_predictions_with_background'])
+        # Compute running localization and classification losses.
+        current_location_losses = loc_loss_fn(
+            prediction_dict['box_encodings'],
+            batch_reg_targets,
+            ignore_nan_targets=True,
+            weights=batch_reg_weights,
+            losses_mask=relevant_losses_mask)
+        current_classification_losses = cls_loss_fn(
+            prediction_dict['class_predictions_with_background'],
+            batch_cls_targets,
+            weights=batch_cls_weights,
+            losses_mask=relevant_losses_mask)
+        location_losses += loc_loss_weight * current_location_losses
+        cls_losses += cls_loss_weight * current_classification_losses
+        all_batch_reg_weights.append(batch_reg_weights)
+        all_batch_cls_weights.append(batch_cls_weights)
+      batch_reg_weights = tf.concat(all_batch_reg_weights, axis=0)
+      batch_cls_weights = tf.concat(all_batch_cls_weights, axis=0)
 
       if self._expected_classification_loss_under_sampling:
         if cls_losses.get_shape().ndims == 3:
@@ -781,13 +830,18 @@ class SSDMetaArch(model.DetectionModel):
       localization_loss_normalizer = normalizer
       if self._normalize_loc_loss_by_codesize:
         localization_loss_normalizer *= self._box_coder.code_size
-      localization_loss = tf.multiply((self._localization_loss_weight /
-                                       localization_loss_normalizer),
-                                      localization_loss,
-                                      name='localization_loss')
-      classification_loss = tf.multiply((self._classification_loss_weight /
-                                         normalizer), classification_loss,
-                                        name='classification_loss')
+      # localization_loss = tf.multiply((self._localization_loss_weight /
+      #                                  localization_loss_normalizer),
+      #                                 localization_loss,
+      #                                 name='localization_loss')
+      # classification_loss = tf.multiply((self._classification_loss_weight /
+      #                                    normalizer), classification_loss,
+      #                                   name='classification_loss')
+      localization_loss = tf.divide(localization_loss,
+                                    localization_loss_normalizer,
+                                    name='localization_loss')
+      classification_loss = tf.divide(classification_loss, normalizer,
+                                      name='classification_loss')
 
       loss_dict = {
           str(localization_loss.op.name): localization_loss,

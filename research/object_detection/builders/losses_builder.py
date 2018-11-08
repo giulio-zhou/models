@@ -42,10 +42,21 @@ def build(loss_config):
     ValueError: If random_example_sampler is getting non-positive value as
       desired positive example fraction.
   """
-  classification_loss = _build_classification_loss(
-      loss_config.classification_loss)
-  localization_loss = _build_localization_loss(
-      loss_config.localization_loss)
+  if len(loss_config.classification_loss) != len(loss_config.localization_loss):
+    raise ValueError('The number of ClassificationLoss elements specified must '
+                     'be equal to the number of LocalizationLoss elements.')
+  classification_loss = [
+      _build_classification_loss(cls_loss)
+      for cls_loss in loss_config.classification_loss
+  ]
+  localization_loss = [
+      _build_localization_loss(loc_loss)
+      for loc_loss in loss_config.localization_loss
+  ]
+  # classification_loss = _build_classification_loss(
+  #     loss_config.classification_loss)
+  # localization_loss = _build_localization_loss(
+  #     loss_config.localization_loss)
   classification_weight = loss_config.classification_weight
   localization_weight = loss_config.localization_weight
   hard_example_miner = None

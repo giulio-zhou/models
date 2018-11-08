@@ -6,20 +6,22 @@ package object_detection.protos;
 // example miner used for training object detection models. See core/losses.py
 // for details
 message Loss {
-  // Localization loss to use.
-  optional LocalizationLoss localization_loss = 1;
+  // Localization loss(es) to use.
+  repeated LocalizationLoss localization_loss = 1;
 
-  // Classification loss to use.
-  optional ClassificationLoss classification_loss = 2;
+  // Classification loss(es) to use.
+  repeated ClassificationLoss classification_loss = 2;
 
   // If not left to default, applies hard example mining.
   optional HardExampleMiner hard_example_miner = 3;
 
   // Classification loss weight.
-  optional float classification_weight = 4 [default=1.0];
+  // optional float classification_weight = 4 [default=1.0];
+  repeated float classification_weight = 4;
 
   // Localization loss weight.
-  optional float localization_weight = 5 [default=1.0];
+  // optional float localization_weight = 5 [default=1.0];
+  repeated float localization_weight = 5;
 
   // If not left to default, applies random example sampling.
   optional RandomExampleSampler random_example_sampler = 6;
